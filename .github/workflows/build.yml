@@ -7,9 +7,6 @@ on:
     branches: [main, master]
   workflow_dispatch:
 
-env:
-  PROJECT_PATH: induction_melter_controller
-
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -36,17 +33,15 @@ jobs:
 
       - name: Build firmware (${{ matrix.env }})
         run: pio run -e ${{ matrix.env }}
-        working-directory: ${{ env.PROJECT_PATH }}
 
       - name: Build filesystem (LittleFS)
         run: pio run -e ${{ matrix.env }} --target buildfs
-        working-directory: ${{ env.PROJECT_PATH }}
 
       - name: Upload all binaries
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.env }}-${{ github.sha }}
-          path: ${{ env.PROJECT_PATH }}/.pio/build/${{ matrix.env }}/*.bin
+          path: .pio/build/${{ matrix.env }}/*.bin
           if-no-files-found: warn
 
   # ═══════════════════════════════════════════
@@ -75,13 +70,11 @@ jobs:
         run: |
           pio run -e esp32-release
           pio run -e esp32-debug
-        working-directory: ${{ env.PROJECT_PATH }}
 
       - name: Build filesystems
         run: |
           pio run -e esp32-release --target buildfs
           pio run -e esp32-debug --target buildfs
-        working-directory: ${{ env.PROJECT_PATH }}
 
       - name: Package binaries
         run: |
@@ -93,9 +86,8 @@ jobs:
             cp .pio/build/$env/bootloader.bin  release/$env/ 2>/dev/null || true
             cp .pio/build/$env/littlefs.bin    release/$env/ 2>/dev/null || true
           done
-        working-directory: ${{ env.PROJECT_PATH }}
 
       - name: Upload release assets
         uses: softprops/action-gh-release@v2
         with:
-          files: ${{ env.PROJECT_PATH }}/release/**/*
+          files: release/**/*
