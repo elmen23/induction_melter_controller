@@ -24,6 +24,8 @@
 #include <Preferences.h>
 #include <esp_task_wdt.h>
 
+using namespace Melter;
+
 /* ------------ NVS state (saved when user clicks Reset / set) ------------ */
 static Preferences g_prefs;
 static void loadNvs() {
