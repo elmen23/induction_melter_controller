@@ -390,7 +390,7 @@ void startTask() {
                     last_ws = now;
                     g_ws.textAll(build_snapshot_json());
                 }
-                g_ws.cleanup();
+                g_ws.cleanupClients();
 
                 /* LED / buzzer feedback for arm state */
                 static uint32_t last_blink = 0;

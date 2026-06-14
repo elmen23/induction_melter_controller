@@ -33,14 +33,10 @@ static bool         g_ramping = false;
 
 /* -------- LEDC install / uninstall helper ----------------------------- */
 static void install_channels(uint32_t freq_hz) {
-    // tear down first
-    ledc_detach_pin(PIN_PWM_OUT_A);
-    ledc_detach_pin(PIN_PWM_OUT_B);
-
     ledc_timer_config_t tcfg = {};
     tcfg.speed_mode      = LEDC_HIGH_SPEED_MODE;
     tcfg.duty_resolution = (ledc_timer_bit_t)LEDC_RES_BITS;
-    tcfg.timer_num       = LEDC_TIMER;
+    tcfg.timer_num       = (ledc_timer_t)LEDC_TIMER;
     tcfg.freq_hz         = freq_hz;
     tcfg.clk_cfg         = LEDC_USE_APB_CLK;
     ESP_ERROR_CHECK( ledc_timer_config(&tcfg) );
@@ -48,7 +44,7 @@ static void install_channels(uint32_t freq_hz) {
     ledc_channel_config_t ccfg = {};
     ccfg.speed_mode = LEDC_HIGH_SPEED_MODE;
     ccfg.channel    = (ledc_channel_t)LEDC_CHAN_A;
-    ccfg.timer_sel  = LEDC_TIMER;
+    ccfg.timer_sel  = (ledc_timer_t)LEDC_TIMER;
     ccfg.gpio_num   = PIN_PWM_OUT_A;
     ccfg.duty       = 0;
     ccfg.hpoint     = 0;
@@ -99,8 +95,6 @@ void end() {
     ledc_update_duty(LEDC_HIGH_SPEED_MODE, (ledc_channel_t)LEDC_CHAN_A);
     ledc_set_duty(LEDC_HIGH_SPEED_MODE, (ledc_channel_t)LEDC_CHAN_B, 0);
     ledc_update_duty(LEDC_HIGH_SPEED_MODE, (ledc_channel_t)LEDC_CHAN_B);
-    ledc_detach_pin(PIN_PWM_OUT_A);
-    ledc_detach_pin(PIN_PWM_OUT_B);
     g_out = false;
 }
 
