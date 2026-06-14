@@ -25,8 +25,8 @@ void taskTag(const char* tag) {
 
 void emit(char level, const char* file, int line, const char* fmt, ...) {
     static const char* lvl[] = { "?", "E", "I", "D", "V" };
-    int idx = (level == 'E') ? 1 : (level == 'I') ? 2 : (level == 'D') ? 3
-              : (level == 'V') ? 4 : 0;
+    int idx = (level == 'E') ? 1 : (level == 'W') ? 2 : (level == 'I') ? 2
+              : (level == 'D') ? 3 : (level == 'V') ? 4 : 0;
     char msgbuf[256];
 
     // --- format user message

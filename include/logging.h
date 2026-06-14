@@ -18,8 +18,10 @@
 #endif
 
 #if LOG_LEVEL >= 2
+#  define LOG_W(fmt, ...) ::Melter::Log::emit('W', __FILE__, __LINE__, fmt, ##__VA_ARGS__)
 #  define LOG_I(fmt, ...) ::Melter::Log::emit('I', __FILE__, __LINE__, fmt, ##__VA_ARGS__)
 #else
+#  define LOG_W(fmt, ...) do {} while (0)
 #  define LOG_I(fmt, ...) do {} while (0)
 #endif
 
