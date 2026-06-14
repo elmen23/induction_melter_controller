@@ -22,6 +22,7 @@ void begin() {
     digitalWrite(PIN_SD_CS, HIGH);
     SPI.begin(PIN_SD_SCK, PIN_SD_MISO, PIN_SD_MOSI, PIN_SD_CS);
     if (!SD.begin(PIN_SD_CS, SPI, 20000000UL)) {
+        SPI.end();
         LOG_W("no SD card — logging disabled");
         return;
     }

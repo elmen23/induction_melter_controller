@@ -108,7 +108,7 @@
 #define PIN_SD_CS                 14
 #define PIN_SD_SCK                19          // shared with TC_SCK
 #define PIN_SD_MISO               18          // shared with TC_SO
-#define PIN_SD_MOSI               19          // ⚠ SD & TC share SCK/MISO only if
+#define PIN_SD_MOSI               23          // ⚠ SD & TC share SCK/MISO only if
                                              //  CS is on different pins — OK here
 
 /* ------------------------------------------------------------------------- *

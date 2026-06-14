@@ -346,16 +346,22 @@ void begin() {
 
     g_ws.onEvent(on_ws_event);
     g_server.addHandler(&g_ws);
-    g_server.begin();
-    LOG_I("HTTP server on port %d", WEB_DEFAULT_PORT);
 
-    start_sta();
+    /* server + WiFi start later from the task (avoids tcpip assert after SD init) */
+    LOG_I("web module registered, networking deferred to task");
 }
 
 void startTask() {
     xTaskCreatePinnedToCore(
         [](void*) {
             Log::taskTag("web");
+
+            /* Defer networking start — allow system to fully init after SD */
+            vTaskDelay(pdMS_TO_TICKS(500));
+            g_server.begin();
+            LOG_I("HTTP server on port %d", WEB_DEFAULT_PORT);
+            start_sta();
+
             uint32_t last_ws = 0;
             uint32_t last_scan = 0;
             while (true) {
