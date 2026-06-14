@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Induction Melter 1CH — Web Console</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header class="topbar">
+    <div class="brand">
+        <div class="logo">⚡</div>
+        <div class="title">
+            <h1>وحدة تحكم الصهر بالحث</h1>
+            <span class="sub">ESP32 — 1 Channel Induction Melter</span>
+        </div>
+    </div>
+    <div class="status-pill" id="connState"><span class="dot"></span><span id="connText">جاري الاتصال…</span></div>
+</header>
+
+<nav class="tabs">
+    <button data-tab="dash" class="active">لوحة التحكم</button>
+    <button data-tab="control">التحكم</button>
+    <button data-tab="presets">المعادن</button>
+    <button data-tab="pid">PID</button>
+    <button data-tab="logs">السجلات</button>
+    <button data-tab="settings">الإعدادات</button>
+</nav>
+
+<!-- ============== TAB 1 — DASHBOARD ============== -->
+<section class="tab active" data-tab="dash">
+    <div class="grid-3 bigcards">
+        <div class="bigcard" id="cardFreq">
+            <div class="biglabel">التردد</div>
+            <div class="bigval"><span id="freqVal">0</span><span class="unit">Hz</span></div>
+            <div class="bigtarget">الهدف: <span id="freqTarget">0</span> Hz</div>
+        </div>
+        <div class="bigcard" id="cardDuty">
+            <div class="biglabel">Duty Cycle</div>
+            <div class="bigval"><span id="dutyVal">0</span><span class="unit">%</span></div>
+            <div class="bigtarget">الهدف: <span id="dutyTarget">0</span>%</div>
+        </div>
+        <div class="bigcard" id="cardPower">
+            <div class="biglabel">القدرة</div>
+            <div class="bigval"><span id="powerVal">0</span><span class="unit">W</span></div>
+            <div class="bigtarget">الهدف: <span id="powerTarget">0</span> W</div>
+        </div>
+    </div>
+
+    <div class="state-bar" id="stateBar">
+        <div class="state-led" id="stateLed"></div>
+        <div class="state-text" id="stateText">—</div>
+        <div class="state-meta" id="stateMeta"></div>
+    </div>
+
+    <div class="action-row">
+        <button class="btn btn-start" id="btnArm">▶ ابدأ التشغيل</button>
+        <button class="btn btn-stop"  id="btnDisarm">■ إيقاف</button>
+        <button class="btn btn-estop" id="btnEstop">⛔ إيقاف طارئ</button>
+        <button class="btn btn-clear" id="btnClear" hidden>إعادة ضبط الفاولت</button>
+    </div>
+
+    <div class="grid-3">
+        <div class="card">
+            <h3>التيار</h3>
+            <div class="gauge" id="gCurrent">
+                <div class="gauge-val"><span id="currVal">0.0</span><span class="unit">A</span></div>
+                <div class="gauge-track"><div class="gauge-fill" id="currBar"></div></div>
+                <div class="gauge-limit">حد: <span id="currLimit">0</span> A</div>
+            </div>
+        </div>
+        <div class="card">
+            <h3>جهد الناقل (Vbus)</h3>
+            <div class="gauge">
+                <div class="gauge-val"><span id="vbusVal">0.0</span><span class="unit">V</span></div>
+                <div class="gauge-track"><div class="gauge-fill" id="vbusBar"></div></div>
+                <div class="gauge-limit" id="vbusLimit">—</div>
+            </div>
+        </div>
+        <div class="card">
+            <h3>التدفق</h3>
+            <div class="gauge">
+                <div class="gauge-val"><span id="flowVal">0.0</span><span class="unit">L/min</span></div>
+                <div class="gauge-track"><div class="gauge-fill" id="flowBar"></div></div>
+                <div class="gauge-limit" id="flowLimit">حد: 1.0 L/min</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid-2">
+        <div class="card">
+            <h3>حرارة IGBT</h3>
+            <div class="gauge">
+                <div class="gauge-val"><span id="igbtVal">0</span><span class="unit">°C</span></div>
+                <div class="gauge-track"><div class="gauge-fill" id="igbtBar"></div></div>
+                <div class="gauge-limit">حد: <span id="igbtLimit">75</span> °C</div>
+            </div>
+        </div>
+        <div class="card">
+            <h3>حرارة المبرد</h3>
+            <div class="gauge">
+                <div class="gauge-val"><span id="coolVal">0</span><span class="unit">°C</span></div>
+                <div class="gauge-track"><div class="gauge-fill" id="coolBar"></div></div>
+                <div class="gauge-limit">حد: <span id="coolLimit">55</span> °C</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card chart-card">
+        <h3>الرسم الحي — التيار والحرارة (آخر 60 ثانية)</h3>
+        <canvas id="liveChart" height="180"></canvas>
+        <div class="legend">
+            <span><i style="background:#ffb84d"></i>التيار (A)</span>
+            <span><i style="background:#ff6b6b"></i>IGBT °C</span>
+            <span><i style="background:#4dc3ff"></i>مبرد °C</span>
+            <span><i style="background:#9eff7e"></i>Vbus (V)</span>
+        </div>
+    </div>
+</section>
+
+<!-- ============== TAB 2 — CONTROL ============== -->
+<section class="tab" data-tab="control">
+    <div class="card">
+        <h3>التحكم في التردد</h3>
+        <div class="slider-row">
+            <input type="range" id="slFreq" min="20000" max="200000" step="100" value="50000">
+            <input type="number" id="nbFreq" min="20000" max="200000" step="100" value="50000">
+            <span class="unit">Hz</span>
+        </div>
+        <div class="btn-row">
+            <button data-step="-10000">−10k</button>
+            <button data-step="-1000">−1k</button>
+            <button data-step="-100">−100</button>
+            <button data-step="100">+100</button>
+            <button data-step="1000">+1k</button>
+            <button data-step="10000">+10k</button>
+        </div>
+    </div>
+
+    <div class="card">
+        <h3>التحكم في Duty Cycle</h3>
+        <div class="slider-row">
+            <input type="range" id="slDuty" min="0" max="95" step="1" value="40">
+            <input type="number" id="nbDuty" min="0" max="95" step="1" value="40">
+            <span class="unit">%</span>
+        </div>
+        <div class="btn-row">
+            <button data-step="-10">−10</button>
+            <button data-step="-5">−5</button>
+            <button data-step="-1">−1</button>
+            <button data-step="1">+1</button>
+            <button data-step="5">+5</button>
+            <button data-step="10">+10</button>
+        </div>
+    </div>
+
+    <div class="card">
+        <h3>القدرة المستهدفة (PID)</h3>
+        <div class="slider-row">
+            <input type="range" id="slPower" min="0" max="3000" step="50" value="1500">
+            <input type="number" id="nbPower" min="0" max="3000" step="50" value="1500">
+            <span class="unit">W</span>
+        </div>
+        <label class="inline">
+            <input type="checkbox" id="pidEnable"> تفعيل PID (تلقائي)
+        </label>
+        <div class="pid-display">
+            خرج PID: <span id="pidOut">0.0</span>% &nbsp;·&nbsp; خطأ: <span id="pidErr">0</span> W
+        </div>
+    </div>
+
+    <div class="card">
+        <h3>أوامر سريعة</h3>
+        <div class="btn-row">
+            <button class="btn-soft" id="btnApply">⬆ تطبيق</button>
+            <button class="btn-soft" id="btnReset">↺ استعادة الافتراضي</button>
+            <button class="btn-soft" id="btnRamp">↗ بداية ناعمة</button>
+        </div>
+    </div>
+</section>
+
+<!-- ============== TAB 3 — PRESETS ============== -->
+<section class="tab" data-tab="presets">
+    <div class="card">
+        <h3>الإعدادات المسبقة حسب المعدن</h3>
+        <div class="presets-grid" id="presetsGrid"></div>
+        <p class="hint">انقر على بطاقة معدن لتحميل التردد و Duty و القدرة الموصى بها. اضبط لاحقاً من تبويب "التحكم".</p>
+    </div>
+</section>
+
+<!-- ============== TAB 4 — PID ============== -->
+<section class="tab" data-tab="pid">
+    <div class="card">
+        <h3>معاملات PID</h3>
+        <div class="pid-grid">
+            <label>Kp <input type="number" id="kp" step="0.01" value="2.0"></label>
+            <label>Ki <input type="number" id="ki" step="0.01" value="0.5"></label>
+            <label>Kd <input type="number" id="kd" step="0.01" value="0.1"></label>
+            <button class="btn-soft" id="btnPidTune">حفظ المعاملات</button>
+        </div>
+        <p class="hint">الـ PID يضبط الـ Duty تلقائياً لمطابقة القدرة المستهدفة بناءً على Vbus × I_primary.</p>
+    </div>
+</section>
+
+<!-- ============== TAB 5 — LOGS ============== -->
+<section class="tab" data-tab="logs">
+    <div class="card">
+        <h3>حالة النظام</h3>
+        <table class="info">
+            <tr><th>IP</th>      <td id="infoIp">—</td></tr>
+            <tr><th>RSSI</th>    <td id="infoRssi">—</td></tr>
+            <tr><th>Uptime</th>  <td id="infoUptime">—</td></tr>
+            <tr><th>Heap</th>    <td id="infoHeap">—</td></tr>
+            <tr><th>Clients</th> <td id="infoClients">—</td></tr>
+            <tr><th>Firmware</th><td id="infoFw">—</td></tr>
+            <tr><th>Faults</th>  <td id="infoFaults">—</td></tr>
+        </table>
+    </div>
+    <div class="card">
+        <h3>فشل/أعطال</h3>
+        <div id="faultNote" class="fault-note">لا يوجد</div>
+    </div>
+</section>
+
+<!-- ============== TAB 6 — SETTINGS ============== -->
+<section class="tab" data-tab="settings">
+    <div class="card">
+        <h3>شبكة WiFi</h3>
+        <div class="wifi-row">
+            <label>SSID
+                <select id="ssidList"></select>
+            </label>
+            <label>Password
+                <input type="password" id="wifiPass" placeholder="اتركه فارغاً للشبكات المفتوحة">
+            </label>
+            <button class="btn-soft" id="btnWifiScan">🔄 فحص</button>
+            <button class="btn-soft" id="btnWifiSave">💾 حفظ و إعادة الاتصال</button>
+        </div>
+    </div>
+    <div class="card">
+        <h3>OTA — تحديث البرنامج</h3>
+        <input type="file" id="otaFile" accept=".bin">
+        <button class="btn-soft" id="btnOta">⬆ رفع و تحديث</button>
+        <div class="progress"><div id="otaBar"></div></div>
+        <p class="hint">يمكنك رفع ملف firmware.bin من PlatformIO: <code>.pio/build/esp32-release/firmware.bin</code></p>
+    </div>
+    <div class="card danger">
+        <h3>منطقة الخطر</h3>
+        <button class="btn btn-stop" id="btnReboot">↻ إعادة تشغيل</button>
+        <button class="btn btn-estop" id="btnFactory">🗑 مسح الإعدادات</button>
+    </div>
+</section>
+
+<div id="toast" class="toast"></div>
+<footer>
+    <span>ESP32 · <span id="verSpan"></span></span>
+    <span>· كل الأوقات تُقاس بـ ms ·  تحديث: <span id="tsSpan">—</span></span>
+</footer>
+
+<script src="/app.js"></script>
+</body>
+</html>
