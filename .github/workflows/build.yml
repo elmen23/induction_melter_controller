@@ -6,11 +6,6 @@ on:
   pull_request:
     branches: [main, master]
   workflow_dispatch:
-    inputs:
-      environment:
-        description: 'Build environment (esp32-debug / esp32-release / all)'
-        default: all
-        required: true
 
 env:
   PROJECT_PATH: induction_melter_controller
@@ -18,33 +13,25 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
-
     strategy:
       matrix:
-        env: [esp32-release]
+        env: [esp32-release, esp32-debug]
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-          cache: 'pip'
 
       - name: Install PlatformIO
-        run: |
-          pip install -U platformio
-          pio --version
+        run: pip install -U platformio
 
       - name: Cache PlatformIO
         uses: actions/cache@v4
         with:
-          path: |
-            ~/.platformio/.cache
-            ~/.platformio/platforms
-            ~/.platformio/packages
+          path: ~/.platformio
           key: pio-${{ runner.os }}-${{ hashFiles('**/platformio.ini') }}
 
       - name: Build firmware (${{ matrix.env }})
@@ -55,62 +42,11 @@ jobs:
         run: pio run -e ${{ matrix.env }} --target buildfs
         working-directory: ${{ env.PROJECT_PATH }}
 
-      - name: Upload firmware binary
+      - name: Upload all binaries
         uses: actions/upload-artifact@v4
         with:
-          name: firmware-${{ matrix.env }}-${{ github.sha }}
+          name: ${{ matrix.env }}-${{ github.sha }}
           path: ${{ env.PROJECT_PATH }}/.pio/build/${{ matrix.env }}/*.bin
-          if-no-files-found: warn
-
-      - name: Upload filesystem binary
-        uses: actions/upload-artifact@v4
-        with:
-          name: filesystem-${{ matrix.env }}-${{ github.sha }}
-          path: ${{ env.PROJECT_PATH }}/.pio/build/${{ matrix.env }}/littlefs.bin
-          if-no-files-found: warn
-
-  build-debug:
-    if: github.event_name == 'workflow_dispatch' && (github.event.inputs.environment == 'all' || github.event.inputs.environment == 'esp32-debug')
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-          cache: 'pip'
-
-      - name: Install PlatformIO
-        run: |
-          pip install -U platformio
-          pio --version
-
-      - uses: actions/cache@v4
-        with:
-          path: |
-            ~/.platformio/.cache
-            ~/.platformio/platforms
-            ~/.platformio/packages
-          key: pio-${{ runner.os }}-${{ hashFiles('**/platformio.ini') }}
-
-      - name: Build firmware (esp32-debug)
-        run: pio run -e esp32-debug
-        working-directory: ${{ env.PROJECT_PATH }}
-
-      - name: Build filesystem (LittleFS)
-        run: pio run -e esp32-debug --target buildfs
-        working-directory: ${{ env.PROJECT_PATH }}
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: firmware-esp32-debug-${{ github.sha }}
-          path: ${{ env.PROJECT_PATH }}/.pio/build/esp32-debug/*.bin
-          if-no-files-found: warn
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: filesystem-esp32-debug-${{ github.sha }}
-          path: ${{ env.PROJECT_PATH }}/.pio/build/esp32-debug/littlefs.bin
           if-no-files-found: warn
 
   # ═══════════════════════════════════════════
@@ -120,10 +56,6 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v')
     needs: [build]
     runs-on: ubuntu-latest
-
-    strategy:
-      matrix:
-        env: [esp32-debug, esp32-release]
 
     steps:
       - uses: actions/checkout@v4
@@ -136,27 +68,31 @@ jobs:
 
       - uses: actions/cache@v4
         with:
-          path: |
-            ~/.platformio/.cache
-            ~/.platformio/platforms
-            ~/.platformio/packages
+          path: ~/.platformio
           key: pio-${{ runner.os }}-${{ hashFiles('**/platformio.ini') }}
 
-      - name: Build firmware (${{ matrix.env }})
-        run: pio run -e ${{ matrix.env }}
+      - name: Build all environments
+        run: |
+          pio run -e esp32-release
+          pio run -e esp32-debug
         working-directory: ${{ env.PROJECT_PATH }}
 
-      - name: Build filesystem
-        run: pio run -e ${{ matrix.env }} --target buildfs
+      - name: Build filesystems
+        run: |
+          pio run -e esp32-release --target buildfs
+          pio run -e esp32-debug --target buildfs
         working-directory: ${{ env.PROJECT_PATH }}
 
       - name: Package binaries
         run: |
-          mkdir -p release/${{ matrix.env }}
-          cp .pio/build/${{ matrix.env }}/firmware.bin    release/${{ matrix.env }}/ 2>/dev/null || true
-          cp .pio/build/${{ matrix.env }}/partitions.bin  release/${{ matrix.env }}/ 2>/dev/null || true
-          cp .pio/build/${{ matrix.env }}/bootloader.bin  release/${{ matrix.env }}/ 2>/dev/null || true
-          cp .pio/build/${{ matrix.env }}/littlefs.bin    release/${{ matrix.env }}/ 2>/dev/null || true
+          mkdir -p release
+          for env in esp32-release esp32-debug; do
+            mkdir -p release/$env
+            cp .pio/build/$env/firmware.bin    release/$env/ 2>/dev/null || true
+            cp .pio/build/$env/partitions.bin  release/$env/ 2>/dev/null || true
+            cp .pio/build/$env/bootloader.bin  release/$env/ 2>/dev/null || true
+            cp .pio/build/$env/littlefs.bin    release/$env/ 2>/dev/null || true
+          done
         working-directory: ${{ env.PROJECT_PATH }}
 
       - name: Upload release assets
